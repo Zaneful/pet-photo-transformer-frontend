@@ -3,46 +3,79 @@ import ReactDOM from 'react-dom/client';
 
 function App() {
   const [prompts, setPrompts] = useState([]);
-  const [selected, setSelected] = useState(null);
+  const [selectedPromptId, setSelectedPromptId] = useState('');
   const [file, setFile] = useState(null);
   const [result, setResult] = useState(null);
-  const BACKEND_URL = import.meta.env.VITE_API_URL;
+  const [isLoading, setIsLoading] = useState(false);
+  const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:10000'; // Fallback for local dev
 
+  // Load prompts from the backend when the app starts
   useEffect(() => {
     fetch(`${BACKEND_URL}/prompts`)
       .then(res => res.json())
-      .then(setPrompts);
+      .then(setPrompts)
+      .catch(error => console.error("Failed to fetch prompts:", error));
   }, []);
 
   const submit = async () => {
+    if (!file || !selectedPromptId) {
+      alert("Please select a style and an image file.");
+      return;
+    }
+
+    setIsLoading(true);
+    setResult(null);
+
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('prompt_id', selectedPromptId);
 
-    const res = await fetch(`${BACKEND_URL}/generate?prompt_id=${selected}`, {
-      method: 'POST',
-      body: formData
-    });
+    try {
+      // Pointing to the correct image generation endpoint
+      const res = await fetch(`${BACKEND_URL}/generate-image`, {
+        method: 'POST',
+        body: formData
+      });
 
-    const data = await res.json();
-    setResult(data);
+      if (!res.ok) {
+        // This will help see errors from the backend more clearly
+        const errorText = await res.text();
+        throw new Error(`HTTP error! status: ${res.status}, message: ${errorText}`);
+      }
+
+      const data = await res.json();
+      setResult(data);
+    } catch (error) {
+      console.error("Failed to generate image:", error);
+      alert(`Something went wrong: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <div>
       <h1>Pet Photo Transformer</h1>
-      <select onChange={e => setSelected(e.target.value)}>
-        <option>Select a Prompt</option>
-        {prompts.map(p => (
-          <option key={p.id} value={p.id}>{p.title}</option>
-        ))}
-      </select>
-      <input type="file" onChange={e => setFile(e.target.files[0])} />
-      <button onClick={submit}>Submit</button>
+      
+      <div>
+        <select onChange={e => setSelectedPromptId(e.target.value)} value={selectedPromptId}>
+          <option value="">Select a Style</option>
+          {prompts.map(p => (
+            <option key={p.id} value={p.id}>{p.title}</option>
+          ))}
+        </select>
+        <input type="file" onChange={e => setFile(e.target.files[0])} />
+        <button onClick={submit} disabled={isLoading}>
+          {isLoading ? 'Generating...' : 'Generate Image'}
+        </button>
+      </div>
+
+      {isLoading && <p>Generating your image, please wait...</p>}
+
       {result && (
         <div>
           <h2>Result</h2>
-          <img src={result.image_url} alt="Generated" style={{ maxWidth: "400px" }} />
-          <p>{result.gemini_result}</p>
+          <img src={result.image_url} alt="Generated" style={{ maxWidth: "500px" }} />
         </div>
       )}
     </div>
