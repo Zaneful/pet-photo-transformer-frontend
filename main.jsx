@@ -28,13 +28,14 @@ function App() {
 
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('prompt_id', selectedPromptId);
+    // REMOVE THIS LINE: formData.append('prompt_id', selectedPromptId); // This was sending it in the body
 
     try {
       // Pointing to the correct image generation endpoint
-      const res = await fetch(`${BACKEND_URL}/generate-image`, {
+      // ADD prompt_id as a query parameter to the URL
+      const res = await fetch(`${BACKEND_URL}/generate-image?prompt_id=${selectedPromptId}`, {
         method: 'POST',
-        body: formData
+        body: formData // The body only contains the 'file' now
       });
 
       if (!res.ok) {
